@@ -1,5 +1,6 @@
 #!/bin/bash
 
+CGO_ENABLED=0
 type=$1
 
 if [ "$type" != "client" ] && [ "$type" != "server" ]; then
@@ -30,4 +31,4 @@ if [ "$GOOS" = "windows" ]; then
 fi
 
 echo "Building $type for $GOOS $dstArch - ver. $version"
-go build -ldflags "-s -w -X 'main.Version=$version'" -o dist/$GOOS/$dstArch/$dstName ./cmd/engarde-$type
+go build -ldflags "-extldflags=-static -X 'main.Version=$version'" -o dist/$GOOS/$dstArch/$dstName.$GOOS.$dstArch ./cmd/engarde-$type
