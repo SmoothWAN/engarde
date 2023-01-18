@@ -1,3 +1,7 @@
+Note: Init.d script customized for SmoothWAN, review before usage.
+
+***
+
 # engarde - Don't lose that packet!
 
 [![Build Status](https://travis-ci.org/porech/engarde.svg?branch=master)](https://travis-ci.org/porech/engarde)
