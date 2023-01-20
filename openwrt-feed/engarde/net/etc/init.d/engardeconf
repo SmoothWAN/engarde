@@ -1,0 +1,64 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+USE_PROCD=1
+
+service_triggers()
+{
+        procd_add_reload_trigger "engardeconf"
+}
+
+reload_service()
+{
+        stop "$@"
+        sleep 5
+        start "$@"
+}
+
+start_service()
+{
+        listenAddr=$(uci get engardeconf.Setup.listenAddr):$(uci get engardeconf.Setup.listenPort)
+        dstAddr=$(uci get engardeconf.Setup.dstAddr):$(uci get engardeconf.Setup.dstPort)
+        skey=$(printf $(uci get engardeconf.Setup.pass) | openssl dgst -binary -sha256 | openssl base64 -A)
+        spubkey=$(echo $skey | wg pubkey)
+        ckey=$(printf $skey | openssl dgst -binary -sha256 | openssl base64 -A)
+        cpubkey=$(echo $ckey | wg pubkey)
+        psk=$(printf $ckey | openssl dgst -binary -sha256 | openssl base64 -A)
+        mkdir /etc/engarde
+        echo -e 'client:\n listenAddr: '$listenAddr' \n dstAddr: '$dstAddr' \n excludedInterfaces: \n   - "br-lan"' > /etc/engarde/engarde.yml
+        if [ ! "$(uci show network.Engarde)" ]; then
+          uci add_list firewall.cfg03dc81.network='Engarde'
+          uci set network.Engarde=interface
+          uci set network.Engarde.proto='wireguard'
+          uci add network wireguard_Engarde # =cfg115a64
+          uci set network.Engarde.private_key="$ckey"
+          uci add_list network.Engarde.addresses='10.202.0.10'
+          uci set network.Engarde.mtu='1280'
+          uci set network.@wireguard_Engarde[-1].public_key="$spubkey"
+          uci set network.@wireguard_Engarde[-1].preshared_key="$psk"
+          uci add_list network.@wireguard_Engarde[-1].allowed_ips='0.0.0.0/0'
+          uci set network.@wireguard_Engarde[-1].route_allowed_ips='1'
+          uci set network.@wireguard_Engarde[-1].endpoint_host="$(uci get engardeconf.Setup.listenAddr)"
+          uci set network.@wireguard_Engarde[-1].endpoint_port="$(uci get engardeconf.Setup.listenPort)"
+          uci set network.@wireguard_Engarde[-1].persistent_keepalive='25'
+          uci commit firewall
+          uci commit network
+        fi
+        procd_open_instance
+        procd_set_param command /usr/bin/engarde-client /etc/engarde/engarde.yml
+        procd_set_param stdout 1
+        procd_set_param stderr 1
+        procd_close_instance
+}
+
+stop_service()
+{
+        killall engarde-client
+        if [ "$(uci show network.Engarde)" ]; then
+           uci del_list firewall.cfg03dc81.network='Engarde'
+           uci del network.Engarde
+           uci del network.@wireguard_Engarde[-1]
+           uci commit firewall
+           uci commit network
+        fi
+}
