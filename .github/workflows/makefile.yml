@@ -34,3 +34,4 @@ jobs:
         file: ./dist/linux/*/*
         tag: ${{ github.ref }}
         file_glob: true
+        overwrite: true
